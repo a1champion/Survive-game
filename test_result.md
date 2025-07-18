@@ -101,3 +101,85 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Continue this game, as the game isn't fully in 3D shapes, I want you to make everything in 3D shapes as these images, from these pictures see the gameplay and style and shapes. And get and download 3D shape online."
+
+backend:
+  - task: "3D Game API endpoints"
+    implemented: false
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Need to implement game state management, save/load, resource tracking APIs"
+
+frontend:
+  - task: "Three.js 3D Engine Setup"
+    implemented: false
+    working: "NA"
+    file: "src/Game.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Need to install Three.js and set up 3D scene with isometric camera"
+
+  - task: "3D Model Integration"
+    implemented: false
+    working: "NA"
+    file: "src/models/"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Need to source and integrate 3D models for characters, buildings, environment"
+
+  - task: "Game Logic System"
+    implemented: false
+    working: "NA"
+    file: "src/GameLogic.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Resource management, worker assignment, survival mechanics"
+
+  - task: "UI System"
+    implemented: false
+    working: "NA"
+    file: "src/UI.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Resource counters, worker panels, drag controls"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Three.js 3D Engine Setup"
+    - "3D Model Integration"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Starting implementation of 3D survival game similar to Whiteout Survival. Will implement Three.js engine, find 3D models online, and create simple drag-to-move and click-to-build mechanics."
