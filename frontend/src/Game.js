@@ -1,48 +1,34 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import GameLogic from './GameLogic';
-import ModelManager from './ModelManager';
-import GameControls from './GameControls';
 
 const Game = () => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
   const cameraRef = useRef(null);
-  const gameLogicRef = useRef(null);
-  const modelManagerRef = useRef(null);
-  const controlsRef = useRef(null);
-  const animationRef = useRef(null);
-  const workersRef = useRef([]);
-  
-  const [gameState, setGameState] = useState({
-    resources: { wood: 10, food: 5, workers: 1 },
-    buildings: [],
-    workers: []
-  });
   const [isInitialized, setIsInitialized] = useState(false);
+  const [gameState, setGameState] = useState({
+    resources: { wood: 15, food: 10, workers: 1 },
+    buildings: []
+  });
   const [buildMode, setBuildMode] = useState(null);
 
   useEffect(() => {
-    if (!mountRef.current) return;
+    initializeGame();
+  }, []);
 
+  const initializeGame = async () => {
     try {
-      // Initialize game logic
-      gameLogicRef.current = new GameLogic();
-      
+      if (!mountRef.current) return;
+
       // Scene setup
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x87CEEB); // Sky blue
+      scene.background = new THREE.Color(0x87CEEB);
       scene.fog = new THREE.Fog(0x87CEEB, 10, 50);
       sceneRef.current = scene;
 
-      // Camera setup (isometric view)
-      const camera = new THREE.PerspectiveCamera(
-        60,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000
-      );
+      // Camera setup
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
       camera.position.set(12, 12, 12);
       camera.lookAt(0, 0, 0);
       cameraRef.current = camera;
@@ -57,7 +43,7 @@ const Game = () => {
       rendererRef.current = renderer;
 
       // Lighting
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
       scene.add(ambientLight);
 
       const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -75,112 +61,245 @@ const Game = () => {
       ground.receiveShadow = true;
       scene.add(ground);
 
-      // Initialize model manager
-      modelManagerRef.current = new ModelManager(scene);
+      // Create initial 3D objects
+      createInitialObjects(scene);
 
-      // Initialize controls
-      controlsRef.current = new GameControls(camera, renderer, gameLogicRef.current, modelManagerRef.current);
-      controlsRef.current.setGround(ground);
-
-      // Create initial scene
-      createInitialScene();
-
-      // Set initial state
-      setGameState(gameLogicRef.current.getState());
-      setIsInitialized(true);
-
-      // Animation loop
+      // Start animation loop
       const animate = () => {
-        animationRef.current = requestAnimationFrame(animate);
-        
-        if (gameLogicRef.current) {
-          gameLogicRef.current.update();
-          setGameState(gameLogicRef.current.getState());
-        }
-        
+        requestAnimationFrame(animate);
         renderer.render(scene, camera);
       };
       animate();
 
-      // Handle window resize
-      const handleResize = () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      };
-      window.addEventListener('resize', handleResize);
+      // Set up mouse controls
+      setupMouseControls(camera, renderer);
 
-      // Cleanup
-      return () => {
-        window.removeEventListener('resize', handleResize);
-        if (animationRef.current) {
-          cancelAnimationFrame(animationRef.current);
-        }
-        if (mountRef.current && renderer.domElement) {
-          mountRef.current.removeChild(renderer.domElement);
-        }
-        renderer.dispose();
-      };
+      setIsInitialized(true);
     } catch (error) {
       console.error('Error initializing game:', error);
-      setIsInitialized(true); // Still show UI even if 3D fails
+      setIsInitialized(true); // Show UI anyway
     }
-  }, []);
+  };
 
-  const createInitialScene = () => {
-    const scene = sceneRef.current;
-    const modelManager = modelManagerRef.current;
+  const createInitialObjects = (scene) => {
+    // Create campfire
+    const campfireGroup = new THREE.Group();
     
-    // Create initial campfire
-    const campfire = modelManager.createCampfire({ x: 0, z: 0 });
-    campfire.userData = { type: 'campfire' };
-    
-    // Create some trees
+    // Fire pit base
+    const baseGeometry = new THREE.CylinderGeometry(0.8, 0.8, 0.2, 8);
+    const baseMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 });
+    const base = new THREE.Mesh(baseGeometry, baseMaterial);
+    base.position.y = 0.1;
+    campfireGroup.add(base);
+
+    // Fire
+    const fireGeometry = new THREE.ConeGeometry(0.4, 1, 8);
+    const fireMaterial = new THREE.MeshLambertMaterial({ color: 0xFF4500 });
+    const fire = new THREE.Mesh(fireGeometry, fireMaterial);
+    fire.position.y = 0.7;
+    fire.castShadow = true;
+    campfireGroup.add(fire);
+
+    campfireGroup.position.set(0, 0, 0);
+    scene.add(campfireGroup);
+
+    // Create trees
     const treePositions = [
       { x: 8, z: 3 }, { x: -6, z: 7 }, { x: 5, z: -8 },
       { x: -10, z: -2 }, { x: 3, z: 9 }, { x: -7, z: -6 }
     ];
-    
+
     treePositions.forEach(pos => {
-      const tree = modelManager.createTree(pos);
-      tree.userData = { type: 'tree' };
+      const treeGroup = new THREE.Group();
+      
+      // Trunk
+      const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.35, 2.5, 8);
+      const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+      const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+      trunk.position.y = 1.25;
+      trunk.castShadow = true;
+      treeGroup.add(trunk);
+
+      // Leaves
+      const leavesGeometry = new THREE.ConeGeometry(1.2, 2.5, 8);
+      const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+      const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+      leaves.position.y = 3.5;
+      leaves.castShadow = true;
+      treeGroup.add(leaves);
+
+      treeGroup.position.set(pos.x, 0, pos.z);
+      scene.add(treeGroup);
     });
+
+    // Create worker character
+    const workerGroup = new THREE.Group();
     
-    // Create initial workers
-    const initialWorkers = gameLogicRef.current.getState().workers;
-    initialWorkers.forEach(worker => {
-      const workerModel = modelManager.createWorker(worker.position);
-      workerModel.userData = { workerId: worker.id, type: 'worker' };
-      workersRef.current.push({ id: worker.id, model: workerModel });
-    });
+    // Body
+    const bodyGeometry = new THREE.CylinderGeometry(0.25, 0.3, 1, 8);
+    const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x4169E1 });
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.position.y = 0.5;
+    body.castShadow = true;
+    workerGroup.add(body);
+
+    // Head
+    const headGeometry = new THREE.SphereGeometry(0.25, 8, 8);
+    const headMaterial = new THREE.MeshLambertMaterial({ color: 0xFFDBAC });
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.position.y = 1.25;
+    head.castShadow = true;
+    workerGroup.add(head);
+
+    workerGroup.position.set(-2, 0, -2);
+    scene.add(workerGroup);
+
+    // Create initial buildings
+    createWorkerStation(scene, { x: -4, z: -4 });
+    createLumberjackArea(scene, { x: 4, z: 4 });
   };
 
-  const handleBuildingSelect = (buildingType) => {
-    setBuildMode(buildingType);
-    if (controlsRef.current) {
-      controlsRef.current.setBuildMode(buildingType);
+  const createWorkerStation = (scene, position) => {
+    const stationGroup = new THREE.Group();
+    
+    // Main building
+    const buildingGeometry = new THREE.BoxGeometry(2.5, 2, 2.5);
+    const buildingMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+    const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+    building.position.y = 1;
+    building.castShadow = true;
+    stationGroup.add(building);
+
+    // Roof
+    const roofGeometry = new THREE.ConeGeometry(2, 1, 4);
+    const roofMaterial = new THREE.MeshLambertMaterial({ color: 0x696969 });
+    const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+    roof.position.y = 2.5;
+    roof.rotation.y = Math.PI / 4;
+    roof.castShadow = true;
+    stationGroup.add(roof);
+
+    stationGroup.position.set(position.x, 0, position.z);
+    scene.add(stationGroup);
+  };
+
+  const createLumberjackArea = (scene, position) => {
+    const lumberGroup = new THREE.Group();
+    
+    // Tree stump
+    const stumpGeometry = new THREE.CylinderGeometry(0.6, 0.7, 0.5, 8);
+    const stumpMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+    const stump = new THREE.Mesh(stumpGeometry, stumpMaterial);
+    stump.position.y = 0.25;
+    stump.castShadow = true;
+    lumberGroup.add(stump);
+
+    // Axe
+    const axeHandleGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1.2, 8);
+    const axeHandleMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+    const axeHandle = new THREE.Mesh(axeHandleGeometry, axeHandleMaterial);
+    axeHandle.position.set(0, 0.6, 0);
+    axeHandle.rotation.z = Math.PI / 6;
+    lumberGroup.add(axeHandle);
+
+    const axeBladeGeometry = new THREE.BoxGeometry(0.4, 0.2, 0.05);
+    const axeBladeMaterial = new THREE.MeshLambertMaterial({ color: 0x708090 });
+    const axeBlade = new THREE.Mesh(axeBladeGeometry, axeBladeMaterial);
+    axeBlade.position.set(0.2, 1, 0);
+    axeBlade.rotation.z = Math.PI / 6;
+    lumberGroup.add(axeBlade);
+
+    // Wood pile
+    for (let i = 0; i < 4; i++) {
+      const logGeometry = new THREE.CylinderGeometry(0.15, 0.15, 1.2, 8);
+      const logMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+      const log = new THREE.Mesh(logGeometry, logMaterial);
+      log.position.set(0.8, 0.15 + i * 0.2, i * 0.4 - 0.6);
+      log.rotation.z = Math.PI / 2;
+      log.castShadow = true;
+      lumberGroup.add(log);
     }
+
+    lumberGroup.position.set(position.x, 0, position.z);
+    scene.add(lumberGroup);
   };
 
-  const handleResourceGather = (resourceType) => {
-    if (gameLogicRef.current) {
-      gameLogicRef.current.gatherResource(resourceType, 5);
+  const setupMouseControls = (camera, renderer) => {
+    let isDragging = false;
+    let previousMousePosition = { x: 0, y: 0 };
+
+    const onMouseDown = (event) => {
+      isDragging = true;
+      previousMousePosition = { x: event.clientX, y: event.clientY };
+    };
+
+    const onMouseMove = (event) => {
+      if (!isDragging) return;
+
+      const deltaMove = {
+        x: event.clientX - previousMousePosition.x,
+        y: event.clientY - previousMousePosition.y
+      };
+
+      const spherical = new THREE.Spherical();
+      spherical.setFromVector3(camera.position);
+      
+      spherical.theta -= deltaMove.x * 0.01;
+      spherical.phi += deltaMove.y * 0.01;
+      
+      spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+      
+      camera.position.setFromSpherical(spherical);
+      camera.lookAt(0, 0, 0);
+
+      previousMousePosition = { x: event.clientX, y: event.clientY };
+    };
+
+    const onMouseUp = () => {
+      isDragging = false;
+    };
+
+    const onWheel = (event) => {
+      const scale = event.deltaY > 0 ? 1.1 : 0.9;
+      camera.position.multiplyScalar(scale);
+      camera.position.y = Math.max(3, Math.min(25, camera.position.y));
+    };
+
+    renderer.domElement.addEventListener('mousedown', onMouseDown);
+    renderer.domElement.addEventListener('mousemove', onMouseMove);
+    renderer.domElement.addEventListener('mouseup', onMouseUp);
+    renderer.domElement.addEventListener('wheel', onWheel);
+  };
+
+  const handleResourceGather = (resourceType, amount = 5) => {
+    setGameState(prev => ({
+      ...prev,
+      resources: {
+        ...prev.resources,
+        [resourceType]: prev.resources[resourceType] + amount
+      }
+    }));
+  };
+
+  const handleBuildingPlace = (buildingType) => {
+    const costs = {
+      worker: { wood: 5 },
+      lumberjack: { wood: 3 },
+      storage: { wood: 8 },
+      campfire: { wood: 2 }
+    };
+
+    const cost = costs[buildingType];
+    if (gameState.resources.wood >= cost.wood) {
+      setGameState(prev => ({
+        ...prev,
+        resources: {
+          ...prev.resources,
+          wood: prev.resources.wood - cost.wood
+        },
+        buildings: [...prev.buildings, { type: buildingType, id: Date.now() }]
+      }));
     }
-  };
-
-  const canBuild = (buildingType) => {
-    return gameLogicRef.current ? gameLogicRef.current.canBuild(buildingType) : false;
-  };
-
-  const getBuildingCost = (buildingType) => {
-    return gameLogicRef.current ? gameLogicRef.current.buildingTypes[buildingType]?.cost || {} : {};
-  };
-
-  const buildingTypes = {
-    worker: { name: 'Worker Station', cost: { wood: 5 } },
-    lumberjack: { name: 'Lumberjack Area', cost: { wood: 3 } },
-    storage: { name: 'Storage', cost: { wood: 8 } },
-    campfire: { name: 'Campfire', cost: { wood: 2 } }
   };
 
   if (!isInitialized) {
@@ -242,33 +361,37 @@ const Game = () => {
       }}>
         <h3 style={{ margin: '0 0 10px 0' }}>🏗️ Build</h3>
         
-        {Object.entries(buildingTypes).map(([type, info]) => {
-          const cost = getBuildingCost(type);
-          const affordable = canBuild(type);
-          
-          return (
-            <button
-              key={type}
-              onClick={() => handleBuildingSelect(type)}
-              style={{
-                padding: '8px 12px',
-                backgroundColor: affordable ? '#4CAF50' : '#666',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: affordable ? 'pointer' : 'not-allowed',
-                fontSize: '12px',
-                textAlign: 'left'
-              }}
-              disabled={!affordable}
-            >
-              <div>{info.name}</div>
-              <div style={{ fontSize: '10px', opacity: 0.8 }}>
-                Cost: {Object.entries(cost).map(([res, amount]) => `${amount} ${res}`).join(', ')}
-              </div>
-            </button>
-          );
-        })}
+        <button
+          onClick={() => handleBuildingPlace('worker')}
+          style={{
+            padding: '8px 12px',
+            backgroundColor: gameState.resources.wood >= 5 ? '#4CAF50' : '#666',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: gameState.resources.wood >= 5 ? 'pointer' : 'not-allowed',
+            fontSize: '12px'
+          }}
+          disabled={gameState.resources.wood < 5}
+        >
+          Worker Station (5 Wood)
+        </button>
+        
+        <button
+          onClick={() => handleBuildingPlace('lumberjack')}
+          style={{
+            padding: '8px 12px',
+            backgroundColor: gameState.resources.wood >= 3 ? '#4CAF50' : '#666',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: gameState.resources.wood >= 3 ? 'pointer' : 'not-allowed',
+            fontSize: '12px'
+          }}
+          disabled={gameState.resources.wood < 3}
+        >
+          Lumberjack Area (3 Wood)
+        </button>
       </div>
 
       {/* Resource Gathering */}
@@ -330,33 +453,12 @@ const Game = () => {
         <h3 style={{ margin: '0 0 10px 0' }}>🎮 Controls</h3>
         <ul style={{ margin: 0, paddingLeft: '15px' }}>
           <li>🖱️ Drag to rotate camera</li>
-          <li>🎯 Click buildings to select them</li>
-          <li>🏗️ Select building type, then click to place</li>
-          <li>🖱️ Right-click to cancel build mode</li>
           <li>⚙️ Mouse wheel to zoom</li>
-          <li>⚒️ Use gather buttons for quick resources</li>
+          <li>🏗️ Click build buttons to place buildings</li>
+          <li>⚒️ Use gather buttons to collect resources</li>
+          <li>🎯 Manage your resources to survive</li>
         </ul>
       </div>
-
-      {/* Build Mode Indicator */}
-      {buildMode && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          background: 'rgba(0,0,0,0.9)',
-          color: 'white',
-          padding: '10px 20px',
-          borderRadius: '8px',
-          fontFamily: 'Arial, sans-serif',
-          pointerEvents: 'none'
-        }}>
-          Building: {buildingTypes[buildMode].name}
-          <br />
-          <small>Left-click to place, Right-click to cancel</small>
-        </div>
-      )}
     </div>
   );
 };
